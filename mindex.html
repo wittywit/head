@@ -105,7 +105,7 @@
 
       // Load the GLTF model using GLTFLoader
       const loader = new THREE.GLTFLoader();
-      loader.load('gallinera_table_1k.gltf', function (gltf) {
+      loader.load('scene.gltf', function (gltf) {
         model = gltf.scene;
         model.scale.set(5, 5, 5); // Increased the scale to make it larger
         model.position.set(0, -1, 0); // Adjust the position so it's visible in front of the camera
