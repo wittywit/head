@@ -84,8 +84,8 @@
       const loader = new THREE.GLTFLoader();
       loader.load('scene.gltf', function (gltf) {
         model = gltf.scene;
-        model.scale.set(0.4, 0.4, 0.4); // Increased the scale to make it larger
-        model.position.set(0, 0, 0); // Adjust the position so it's visible in front of the camera
+        model.scale.set(0.3, 0.3, 0.3); // Increased the scale to make it larger
+        model.position.set(0.2, 0.2, 0.2); // Adjust the position so it's visible in front of the camera
         scene.add(model);
 
         // Set up the Animation Mixer to play animations
@@ -122,7 +122,7 @@
         let rightEye = poses[0].pose.keypoints.find(k => k.part === 'rightEye');
         if (rightEye && rightEye.score > 0.2) {
           // Map rightEye position to target rotation of the model (inverted range to reverse the direction)
-          let targetRotationY = map(rightEye.position.x, 0, video.width, Math.PI, -Math.PI);
+          let targetRotationY = map(rightEye.position.x, 0, video.width, -Math.PI, Math.PI);
           // Use lerp to smooth the transition from current rotation to target rotation
           currentRotationY = lerp(currentRotationY, targetRotationY, 0.1);
           model.rotation.y = currentRotationY;
