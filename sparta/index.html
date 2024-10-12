@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+  <title>PoseNet Controlled 3D GLTF Model with Animation</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <p id="status">Loading...</p>
+  <script>
+    // Video and PoseNet variables
+    let video;
+    let poseNet;
+    let poses = [];
+
+    // Three.js variables
+    let scene, camera, renderer, model, mixer;
+    let currentRotationY = 0; // The current Y rotation value for smoothing
+    let clock = new THREE.Clock(); // Clock to track time for animations
+
+    // Setup Three.js and video elements
+    function setup() {
+      // Set up Three.js scene
+      setupThreeJS();
+
+      // Set up the video capture
+      video = document.createElement('video');
+      video.width = 640;
+      video.height = 480;
+      video.autoplay = true;
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function (stream) {
+          video.srcObject = stream;
+          video.play();
+
+          // Once video is ready, initialize PoseNet
+          setupPoseNet();
+        })
+        .catch(function (err) {
+          console.error('Error accessing webcam: ', err);
+        });
+    }
+
+    function setupPoseNet() {
+      // Initialize ml5 PoseNet with the video
+      poseNet = ml5.poseNet(video, modelReady);
+      poseNet.on('pose', function (results) {
+        poses = results;
+      });
+    }
+
+    function modelReady() {
+      document.getElementById('status').innerText = 'Model Loaded';
+    }
+
+    function setupThreeJS() {
+      // Scene, Camera, Renderer setup
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Adding more lights to ensure the model is visible
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Increased intensity
+      scene.add(ambientLight);
+
+      const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.5); // Brighter light
+      directionalLight1.position.set(2, 2, 2);
+      scene.add(directionalLight1);
+
+      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.0);
+      directionalLight2.position.set(-2, -2, 2);
+      scene.add(directionalLight2);
+
+      // Load the GLTF model using GLTFLoader
+      const loader = new THREE.GLTFLoader();
+      loader.load('scene.gltf', function (gltf) {
+        model = gltf.scene;
+        model.scale.set(1, 1, 1); // Increased the scale to make it larger
+        model.position.set(0.2, -1, 0.2); // Adjust the position so it's visible in front of the camera
+        scene.add(model);
+
+        // Set up the Animation Mixer to play animations
+        mixer = new THREE.AnimationMixer(model);
+        if (gltf.animations.length > 0) {
+          // Play the first animation clip (you can adjust which animation to play)
+          const action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+        }
+      }, undefined, function (error) {
+        console.error('An error happened', error);
+      });
+
+      // Set camera position
+      camera.position.set(0, 1, 5); // Position the camera so it's looking at the model
+
+      // Start animation loop
+      animate();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Get delta time for mixer to ensure smooth animation playback
+      const delta = clock.getDelta();
+
+      // Update the mixer to play animations if it exists
+      if (mixer) {
+        mixer.update(delta);
+      }
+
+      // If PoseNet detects a pose, rotate the model based on right eye position
+      if (poses.length > 0 && model) {
+        let rightEye = poses[0].pose.keypoints.find(k => k.part === 'rightEye');
+        if (rightEye && rightEye.score > 0.2) {
+          // Map rightEye position to target rotation of the model (inverted range to reverse the direction)
+          let targetRotationY = map(rightEye.position.x, 0, video.width, -Math.PI, Math.PI);
+          // Use lerp to smooth the transition from current rotation to target rotation
+          currentRotationY = lerp(currentRotationY, targetRotationY, 0.1);
+          model.rotation.y = currentRotationY;
+        }
+      }
+
+      // Render the Three.js scene
+      renderer.render(scene, camera);
+    }
+
+    // Utility function to map a value from one range to another
+    function map(value, start1, stop1, start2, stop2) {
+      return start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));
+    }
+
+    // Utility function for linear interpolation (lerp)
+    function lerp(start, end, amount) {
+      return start + (end - start) * amount;
+    }
+
+    // Start the setup when the page loads
+    window.onload = setup;
+
+    // Handle window resizing
+    window.addEventListener('resize', function () {
+      if (camera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+  </script>
+</body>
+</html>
